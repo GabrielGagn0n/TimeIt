@@ -1,0 +1,23 @@
+{
+  "manifest_version": 2,
+  "name": "Green Square Extension",
+  "version": "1.0",
+  "description": "Adds a green square to Twitter and Facebook pages.",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://x.com/*",
+        "*://www.facebook.com/*"
+      ],
+      "js": ["content.js"]
+    }
+  ]
+}
