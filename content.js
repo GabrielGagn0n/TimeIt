@@ -1,4 +1,6 @@
 let offsetX, offsetY;
+let timerInterval;
+let seconds = 0;
 
 function getSquare()
 {
@@ -7,8 +9,23 @@ function getSquare()
     timeSquare.style.width = '200px';
     timeSquare.style.height = '100px';
     timeSquare.style.position = 'fixed';
-    timeSquare.style.zIndex = '1000';
-    timeSquare.style.boxShadow = '0 0 0 2px white';
+    timeSquare.style.zIndex = '1000';    
+    timeSquare.style.display = 'flex';
+    timeSquare.style.alignItems = 'center';
+    timeSquare.style.justifyContent = 'center';
+    timeSquare.style.fontFamily = 'Arial, sans-serif';
+    timeSquare.style.fontWeight = 'bold';
+    timeSquare.style.boxShadow = '0 0 0 3px white';
+
+    const timerDisplay = document.createElement('div');
+    timerDisplay.id = "TimerDisplay";
+    timerDisplay.style.color = 'white';
+    timerDisplay.style.fontSize = '26px';
+    timerDisplay.style.lineHeight = '100px'; // Center vertically
+    timerDisplay.style.fontFamily = "Arial";
+    timerDisplay.style.textShadow = '2px 2px 4px rgba(0, 0, 0, 0.3)';
+    timeSquare.appendChild(timerDisplay);
+
     return timeSquare;
 }
 
@@ -45,16 +62,16 @@ function updateBorderRadius() {
 
     // Set border-radius based on snapped edges
     if(distances.top <= 0) {
-        timeSquare.style.borderRadius = "0 0 10px 10px";
+        timeSquare.style.borderRadius = "0 0 12px 12px";
     }
     else if (distances.bottom <= 0) {
-        timeSquare.style.borderRadius = "10px 10px 0 0";
+        timeSquare.style.borderRadius = "12px 12px 0 0";
     }
     else if (distances.left <= 0) {
-        timeSquare.style.borderRadius = "0 10px 10px 0";
+        timeSquare.style.borderRadius = "0 12px 12px 0";
     }
     else if (distances.right <= 0) {
-        timeSquare.style.borderRadius = "10px 0 0 10px";
+        timeSquare.style.borderRadius = "12px 0 0 12px";
     }
     else {
         defaultBorderRadius();
@@ -63,21 +80,24 @@ function updateBorderRadius() {
 
 function defaultBorderRadius(){
     let timeSquare = document.getElementById("TimeItSquare");
-    timeSquare.style.borderRadius = "10px 10px 10px 10px";
+    timeSquare.style.borderRadius = "12px";
 }
 
 
 document.addEventListener('visibilitychange', () => {
-    if (document.getElementById("TimeItSquare") && document.visibilityState === 'visible') {
-        loadSquarePosition();
+    if (document.getElementById("TimeItSquare")) {
+        if (document.visibilityState === 'visible') {
+            loadSquarePosition();
+            startTimer();
+        } else {
+            stopTimer();
+        }
     }
 });
 
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
     setSquareColor();
 });
-
-
 
 function mouseMoveHandler(e) {
     let timeSquare = document.getElementById("TimeItSquare");
@@ -87,12 +107,23 @@ function mouseMoveHandler(e) {
 }
 
 browser.storage.local.get("savedSites").then((data) => {
-    let sites = data.savedSites || [];
-    let currentDomain = window.location.hostname.replace(/^www\./, "");
+        let sites = data.savedSites || [];
+        let currentDomain = window.location.hostname.replace(/^www\./, "");
 
-    if (sites.some(site => currentDomain.endsWith(site))) { 
-        addSquare();
-    }
+        if (sites.some(site => currentDomain.endsWith(site))) { 
+            addSquare();
+        }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    browser.storage.local.get("savedSites").then((data) => {
+        let sites = data.savedSites || [];
+        let currentDomain = window.location.hostname.replace(/^www\./, "");
+
+        if (sites.some(site => currentDomain.endsWith(site))) { 
+            addSquare();
+        }
+    });
 });
 
 function mouseUpHandler() {
@@ -145,11 +176,27 @@ browser.runtime.onMessage.addListener((message) => {
     }
 });
 
+function startTimer() {
+    if (!timerInterval) {
+        timerInterval = setInterval(() => {
+            seconds++;
+            updateTimerDisplay();
+            const currentDomain = window.location.hostname.replace(/^www\./, "");
+            browser.storage.local.set({ timers: { [currentDomain]: seconds } });
+        }, 1000);
+    }
+}
+
+function stopTimer() {
+    clearInterval(timerInterval);
+    timerInterval = null; // Reset the timer interval
+}
 
 function removeSquare()
 {
     let square = document.getElementById("TimeItSquare");
     if (square) {
+        clearInterval(timerInterval);
         square.remove();
     }
 }
@@ -167,6 +214,17 @@ function addSquare() {
             document.body.appendChild(timeSquare);
             setSquareColor();
 
+            const currentDomain = window.location.hostname.replace(/^www\./, "");
+            browser.storage.local.get("timers").then((result) => {
+                const timers = result.timers || {};
+                seconds = timers[currentDomain] || 0;
+                updateTimerDisplay();
+            });
+
+            if (document.visibilityState === 'visible') {
+                startTimer();
+            }
+
             timeSquare.addEventListener('mousedown', (e) => {
                 offsetX = e.clientX - timeSquare.getBoundingClientRect().left;
                 offsetY = e.clientY - timeSquare.getBoundingClientRect().top;
@@ -178,5 +236,13 @@ function addSquare() {
             updateBorderRadius();
         }).catch(error => console.error("Failed to get square position:", error));
     }
+}
+
+function updateTimerDisplay() {
+    const timerDisplay = document.getElementById("TimerDisplay");
+    const hh = String(Math.floor(seconds / 3600)).padStart(2, '0');
+    const mm = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+    const ss = String(seconds % 60).padStart(2, '0');
+    timerDisplay.textContent = `${hh}:${mm}:${ss}`;
 }
 
